@@ -18,3 +18,7 @@ func (fifo *FIFO) Next() *job.Job {
 	fifo.jobs = fifo.jobs[1:]
 	return next
 }
+
+func (fifo *FIFO) Len() int {
+	return len(fifo.jobs)
+}
