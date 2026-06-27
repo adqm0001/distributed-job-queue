@@ -10,21 +10,26 @@ import (
 	"github.com/adqm0001/distributed-job-queue/internal/worker"
 )
 
-func handlePrint(payload []byte) error {
-	fmt.Println("processing:", string(payload))
-	return nil
+// alwaysFails never succeeds, so we can watch retries + the dead-letter happen.
+func alwaysFails(payload []byte) error {
+	fmt.Println("attempting:", string(payload))
+	return fmt.Errorf("boom")
 }
 
 func main() {
 	q := queue.NewQueue(&policy.FIFO{})
 	pool := worker.NewPool(q)
 
-	pool.Register("print", handlePrint)
+	pool.Register("flaky", alwaysFails)
 	pool.Start(3)
 
-	for i := 1; i <= 5; i++ {
-		q.Submit(job.NewJob("print", []byte(fmt.Sprintf("job #%d", i))))
-	}
+	q.Submit(job.NewJob("flaky", []byte("job A")))
 
-	time.Sleep(time.Second)
+	// Wait for the retries (1s then 2s) to play out and the job to die.
+	time.Sleep(5 * time.Second)
+
+	fmt.Println("--- dead letter ---")
+	for _, j := range pool.DeadJobs() {
+		fmt.Printf("id=%s kind=%s attempts=%d state=%s\n", j.ID, j.Kind, j.Attempts, j.State)
+	}
 }
