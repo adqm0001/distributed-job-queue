@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"time"
+	"os"
+	"os/signal"
 
 	"github.com/adqm0001/distributed-job-queue/internal/job"
 	"github.com/adqm0001/distributed-job-queue/internal/policy"
@@ -19,12 +21,17 @@ func main() {
 	q := queue.NewQueue(&policy.PriorityQueue{})
 	pool := worker.NewPool(q)
 	pool.Register("print", handlePrint)
+	pool.Start(3)
 
 	q.Submit(job.NewJob("print", []byte("low job"), job.Low))
 	q.Submit(job.NewJob("print", []byte("high job"), job.High))
 	q.Submit(job.NewJob("print", []byte("medium job"), job.Medium))
 
-	pool.Start(1)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	time.Sleep(time.Second)
+	<-ctx.Done()
+	fmt.Println("shutting down...")
+	pool.Stop()
+	fmt.Println("done")
 }
