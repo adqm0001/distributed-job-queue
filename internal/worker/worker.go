@@ -2,6 +2,7 @@ package worker
 
 import (
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -21,7 +22,8 @@ type Pool struct {
 }
 
 func backoff(attempts int) time.Duration {
-	return time.Duration(math.Pow(2, float64(attempts-1))) * time.Second
+	exp := int64(math.Pow(2, float64(attempts-1))) * int64(time.Second)
+	return time.Duration(rand.Int63n(exp))
 }
 
 func NewPool(q *queue.Queue) *Pool {
