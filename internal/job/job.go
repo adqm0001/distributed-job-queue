@@ -11,13 +11,13 @@ const (
 	Dead    Status = "dead"
 )
 
-type Priority int 
+type Priority int
 
 const (
-	High Priority = 2 
-	Medium Priority = 1 
-	Low Priority = 0 
-) 
+	High   Priority = 2
+	Medium Priority = 1
+	Low    Priority = 0
+)
 
 type Job struct {
 	ID       string

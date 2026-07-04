@@ -20,26 +20,28 @@ func NewQueue(p policy.SchedulingPolicy) *Queue {
 	return q
 }
 
-func (q *Queue) Submit(j *job.Job) {
+func (q *Queue) Submit(j *job.Job) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	if q.closing {
-		return
+		return nil
 	}
 
 	q.policy.Add(j)
 	q.cond.Signal()
+	return nil
 }
 
-func (q *Queue) Close() {
+func (q *Queue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closing = true
 	q.cond.Broadcast()
+	return nil
 }
 
-func (q *Queue) Dequeue() *job.Job {
+func (q *Queue) Dequeue() (*job.Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for q.policy.Len() == 0 && !q.closing {
@@ -47,8 +49,8 @@ func (q *Queue) Dequeue() *job.Job {
 	}
 
 	if q.policy.Len() == 0 && q.closing {
-		return nil
+		return nil, nil
 	}
 
-	return q.policy.Next()
+	return q.policy.Next(), nil
 }

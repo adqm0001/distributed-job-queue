@@ -1,21 +1,29 @@
 package worker
 
 import (
+	"context"
+	"errors"
+	"log"
 	"math"
 	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/adqm0001/distributed-job-queue/internal/job"
-	"github.com/adqm0001/distributed-job-queue/internal/queue"
 )
 
 type Handler func(payload []byte) error
 
+type Queue interface {
+	Submit(j *job.Job) error
+	Dequeue() (*job.Job, error)
+	Close() error
+}
+
 const maxAttempts = 3
 
 type Pool struct {
-	queue    *queue.Queue
+	queue    Queue
 	handlers map[string]Handler
 	dead     *DeadLetter
 	wg       sync.WaitGroup
@@ -26,7 +34,7 @@ func backoff(attempts int) time.Duration {
 	return time.Duration(rand.Int63n(exp))
 }
 
-func NewPool(q *queue.Queue) *Pool {
+func NewPool(q Queue) *Pool {
 	return &Pool{queue: q, handlers: make(map[string]Handler), dead: &DeadLetter{}}
 }
 
@@ -42,7 +50,14 @@ func (p *Pool) work() {
 	defer p.wg.Done()
 
 	for {
-		j := p.queue.Dequeue()
+		j, err := p.queue.Dequeue()
+
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				log.Println(err)
+			}
+			return
+		}
 
 		if j == nil {
 			return
@@ -54,9 +69,9 @@ func (p *Pool) work() {
 			continue
 		}
 
-		err := handler(j.Payload)
+		handleErr := handler(j.Payload)
 
-		if err == nil {
+		if handleErr == nil {
 			j.State = job.Done
 			continue
 		}
@@ -69,7 +84,10 @@ func (p *Pool) work() {
 		} else {
 			go func() {
 				time.Sleep(backoff(j.Attempts))
-				p.queue.Submit(j)
+				err := p.queue.Submit(j)
+				if err != nil {
+					log.Println(err)
+				}
 			}()
 		}
 	}
