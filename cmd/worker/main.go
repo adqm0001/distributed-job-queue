@@ -11,12 +11,17 @@ import (
 )
 
 func main() {
-	name := "worker"
+	name, _ := os.Hostname()
 	if len(os.Args) > 1 {
 		name = os.Args[1]
 	}
 
-	client := broker.NewRedisFIFO("localhost:6379", "jobs")
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+
+	client := broker.NewRedisFIFO(addr, "jobs")
 	pool := worker.NewPool(client)
 
 	pool.Register("print", func(payload []byte) error {
