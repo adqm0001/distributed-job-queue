@@ -41,6 +41,14 @@ func (q *Queue) Close() error {
 	return nil
 }
 
+func (q *Queue) Ack(j *job.Job) error {
+	return nil
+}
+
+func (q *Queue) Nack(j *job.Job) error {
+	return q.Submit(j)
+}
+
 func (q *Queue) Dequeue() (*job.Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()

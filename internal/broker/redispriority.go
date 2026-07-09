@@ -60,6 +60,14 @@ func (r *RedisPriority) Dequeue() (*job.Job, error) {
 	}
 }
 
+func (r *RedisPriority) Ack(j *job.Job) error {
+	return nil
+}
+
+func (r *RedisPriority) Nack(j *job.Job) error {
+	return r.Submit(j)
+}
+
 func (r *RedisPriority) Close() error {
 	r.cancel()
 	return nil

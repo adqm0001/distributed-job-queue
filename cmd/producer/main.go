@@ -15,7 +15,7 @@ func main() {
 		addr = "localhost:6379"
 	}
 
-	client := broker.NewRedisFIFO(addr, "jobs")
+	client := broker.NewRedisReliable(addr)
 
 	for i := 1; i <= 10; i++ {
 		err := client.Submit(job.NewJob("print", []byte(fmt.Sprintf("job-%d", i)), job.Medium))

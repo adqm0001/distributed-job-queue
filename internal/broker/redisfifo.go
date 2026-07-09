@@ -56,6 +56,14 @@ func (r *RedisFIFO) Dequeue() (*job.Job, error) {
 	}
 }
 
+func (r *RedisFIFO) Ack(j *job.Job) error {
+	return nil
+}
+
+func (r *RedisFIFO) Nack(j *job.Job) error {
+	return r.Submit(j)
+}
+
 func (r *RedisFIFO) Close() error {
 	r.cancel()
 	return nil

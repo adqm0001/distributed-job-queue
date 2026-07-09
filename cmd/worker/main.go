@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/adqm0001/distributed-job-queue/internal/broker"
 	"github.com/adqm0001/distributed-job-queue/internal/worker"
@@ -21,7 +23,7 @@ func main() {
 		addr = "localhost:6379"
 	}
 
-	client := broker.NewRedisFIFO(addr, "jobs")
+	client := broker.NewRedisReliable(addr)
 	pool := worker.NewPool(client)
 
 	pool.Register("print", func(payload []byte) error {
@@ -34,6 +36,25 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n, err := client.Reap(5 * time.Minute)
+				if err != nil {
+					log.Println(err)
+				} else if n > 0 {
+					log.Printf("[%s] reaped %d stuck jobs\n", name, n)
+				}
+			}
+		}
+	}()
+
 	<-ctx.Done()
 
 	fmt.Printf("[%s] shutting down\n", name)
