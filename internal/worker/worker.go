@@ -9,7 +9,7 @@ import (
 	"github.com/adqm0001/distributed-job-queue/internal/job"
 )
 
-type Handler func(payload []byte) error
+type Handler func(j *job.Job) error
 
 type Queue interface {
 	Submit(j *job.Job) error
@@ -60,7 +60,7 @@ func (p *Pool) work() {
 			continue
 		}
 
-		if err := handler(j.Payload); err != nil {
+		if err := handler(j); err != nil {
 			log.Println(err)
 			if err := p.queue.Nack(j); err != nil {
 				log.Println(err)

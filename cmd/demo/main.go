@@ -12,8 +12,8 @@ import (
 	"github.com/adqm0001/distributed-job-queue/internal/worker"
 )
 
-func handlePrint(payload []byte) error {
-	fmt.Println("processing:", string(payload))
+func handlePrint(j *job.Job) error {
+	fmt.Println("processing:", string(j.Payload))
 	return nil
 }
 
