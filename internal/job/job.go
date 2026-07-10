@@ -1,6 +1,10 @@
 package job
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Status string
 
@@ -20,12 +24,14 @@ const (
 )
 
 type Job struct {
-	ID       string
-	Attempts int
-	Kind     string
-	Payload  []byte
-	State    Status
-	Priority Priority
+	ID        string
+	Attempts  int
+	Kind      string
+	Payload   []byte
+	State     Status
+	Priority  Priority
+	UniqueKey string
+	UniqueTTL time.Duration
 }
 
 func NewJob(kind string, payload []byte, priority Priority) *Job {

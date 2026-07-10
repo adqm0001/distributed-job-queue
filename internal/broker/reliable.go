@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 
 	"github.com/adqm0001/distributed-job-queue/internal/job"
 )
+
+var ErrDuplicate = errors.New("duplicate task")
 
 type RedisReliable struct {
 	client      *redis.Client
@@ -34,19 +37,48 @@ func NewRedisReliable(addr string) *RedisReliable {
 	}
 }
 
+var submitUniqueScript = redis.NewScript(`
+local ok = redis.call('SET', KEYS[2], ARGV[1], 'NX', 'EX', ARGV[2])
+if not ok then
+  return 0
+end
+redis.call('HSET', KEYS[3], 'data', ARGV[3], 'state', 'pending', 'attempts', 0, 'unique', KEYS[2])
+redis.call('LPUSH', KEYS[1], ARGV[1])
+return 1
+`)
+
 func (r *RedisReliable) Submit(j *job.Job) error {
 	data, err := json.Marshal(j)
 	if err != nil {
 		return err
 	}
-	if err := r.client.HSet(r.ctx, "task:"+j.ID,
-		"data", data,
-		"state", string(job.Pending),
-		"attempts", 0,
-	).Err(); err != nil {
+
+	if j.UniqueKey == "" {
+		if err := r.client.HSet(r.ctx, "task:"+j.ID,
+			"data", data,
+			"state", string(job.Pending),
+			"attempts", 0,
+		).Err(); err != nil {
+			return err
+		}
+		return r.client.LPush(r.ctx, r.pending, j.ID).Err()
+	}
+
+	ttl := int64(j.UniqueTTL.Seconds())
+	if ttl <= 0 {
+		ttl = 86400
+	}
+	res, err := submitUniqueScript.Run(r.ctx, r.client,
+		[]string{r.pending, "unique:" + j.UniqueKey, "task:" + j.ID},
+		j.ID, ttl, data,
+	).Int()
+	if err != nil {
 		return err
 	}
-	return r.client.LPush(r.ctx, r.pending, j.ID).Err()
+	if res == 0 {
+		return ErrDuplicate
+	}
+	return nil
 }
 
 var reserveScript = redis.NewScript(`
@@ -93,11 +125,20 @@ func (r *RedisReliable) Dequeue() (*job.Job, error) {
 	}
 }
 
+var ackScript = redis.NewScript(`
+local id = ARGV[1]
+local tk = 'task:' .. id
+redis.call('ZREM', KEYS[1], id)
+local lock = redis.call('HGET', tk, 'unique')
+if lock and redis.call('GET', lock) == id then
+  redis.call('DEL', lock)
+end
+redis.call('DEL', tk)
+return 1
+`)
+
 func (r *RedisReliable) Ack(j *job.Job) error {
-	if err := r.client.ZRem(r.ctx, r.active, j.ID).Err(); err != nil {
-		return err
-	}
-	return r.client.Del(r.ctx, "task:"+j.ID).Err()
+	return ackScript.Run(r.ctx, r.client, []string{r.active}, j.ID).Err()
 }
 
 var failScript = redis.NewScript(`
@@ -108,6 +149,10 @@ redis.call('ZREM', KEYS[2], id)
 if attempts >= tonumber(ARGV[2]) then
   redis.call('HSET', tk, 'state', 'dead')
   redis.call('LPUSH', KEYS[3], id)
+  local lock = redis.call('HGET', tk, 'unique')
+  if lock and redis.call('GET', lock) == id then
+    redis.call('DEL', lock)
+  end
 else
   redis.call('HSET', tk, 'state', 'pending')
   redis.call('LPUSH', KEYS[1], id)
@@ -135,6 +180,10 @@ for i = 1, #ids do
   if attempts >= max then
     redis.call('HSET', tk, 'state', 'dead')
     redis.call('LPUSH', KEYS[3], id)
+    local lock = redis.call('HGET', tk, 'unique')
+    if lock and redis.call('GET', lock) == id then
+      redis.call('DEL', lock)
+    end
   else
     redis.call('HSET', tk, 'state', 'pending')
     redis.call('LPUSH', KEYS[1], id)
