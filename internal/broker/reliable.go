@@ -18,6 +18,7 @@ type RedisReliable struct {
 	client      *redis.Client
 	ctx         context.Context
 	cancel      context.CancelFunc
+	scheduled   string
 	pending     string
 	active      string
 	dead        string
@@ -30,6 +31,7 @@ func NewRedisReliable(addr string) *RedisReliable {
 		client:      redis.NewClient(&redis.Options{Addr: addr}),
 		ctx:         ctx,
 		cancel:      cancel,
+		scheduled:   "scheduled",
 		pending:     "pending",
 		active:      "active",
 		dead:        "dead",

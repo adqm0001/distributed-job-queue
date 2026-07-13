@@ -9,10 +9,11 @@ import (
 type Status string
 
 const (
-	Pending Status = "pending"
-	Running Status = "running"
-	Done    Status = "done"
-	Dead    Status = "dead"
+	Scheduled Status = "scheduled"
+	Pending   Status = "pending"
+	Running   Status = "running"
+	Done      Status = "done"
+	Dead      Status = "dead"
 )
 
 type Priority int

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/adqm0001/distributed-job-queue/internal/broker"
 	"github.com/adqm0001/distributed-job-queue/internal/job"
@@ -24,4 +25,11 @@ func main() {
 		}
 	}
 	fmt.Println("submitted 10 jobs")
+
+	err := client.Schedule(job.NewJob("print", []byte("delayed job"), job.Medium), 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("scheduled 1 job for 5s from now")
 }

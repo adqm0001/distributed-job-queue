@@ -69,6 +69,24 @@ func main() {
 		}
 	}()
 
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n, err := client.PromoteDue()
+				if err != nil {
+					log.Println(err)
+				} else if n > 0 {
+					log.Printf("[%s] scheduled %d jobs\n", name, n)
+				}
+			}
+		}
+	}()
+
 	<-ctx.Done()
 
 	fmt.Printf("[%s] shutting down\n", name)
